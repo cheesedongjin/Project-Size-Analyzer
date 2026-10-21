@@ -385,3 +385,4 @@ td.path .dir { color: var(--muted); }
 .donut-wrap.compact { gap: 14px; }
 .donut-wrap.compact .legend li { font-size: 12px; grid-template-columns: 10px 1fr auto 44px; }
 .card h3 .toggle { font-weight: 400; }
+.static-note { margin: 0 0 12px; padding: 10px 12px; border-radius: 9px; background: color-mix(in srgb, #f0b04b 14%, transparent); border: 1px solid color-mix(in srgb, #f0b04b 40%, transparent); color: var(--text); font-size: 13px; }

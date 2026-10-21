@@ -66,7 +66,7 @@ function initInputs() {
 
   $$('.seg').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   // GitHub Pages 등 정적 호스팅에서는 서버가 없으므로 브라우저 폴더 분석만 허용
-  if (STATIC_HOST) $$('.seg').forEach((b) => { if (b.dataset.mode !== 'upload') { b.disabled = true; b.title = '로컬에서 npm start로 서버를 실행해야 사용할 수 있습니다.'; } });
+  if (STATIC_HOST) $$('.mode-panel:not([data-mode="upload"])').forEach((p) => p.insertAdjacentHTML('afterbegin', '<p class="static-note">이 모드는 서버가 필요해 GitHub Pages에서는 사용할 수 없습니다. 저장소를 받아 <code>npm start</code>로 실행하거나, "폴더 선택 (브라우저)"를 이용하세요.</p>'));
   setMode(STATIC_HOST ? 'upload' : store.get('psa-mode', 'github'));
   $$('[data-example]').forEach((b) => b.addEventListener('click', () => { $('#gh-url').value = b.dataset.example; $('#gh-branch').value = ''; }));
 
@@ -117,6 +117,7 @@ function setMode(mode) {
   $$('.mode-panel').forEach((p) => { p.hidden = p.dataset.mode !== mode; });
   $('#opt-gitignore').closest('label').style.opacity = mode === 'upload' ? 0.45 : 1;
   $('#opt-history').closest('label').style.opacity = mode === 'upload' ? 0.45 : 1;
+  $('#analyze-btn').disabled = STATIC_HOST && mode !== 'upload';
 }
 
 function setUpload(name, files, skipped) {
