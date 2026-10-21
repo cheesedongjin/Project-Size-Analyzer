@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Size Analyzer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='16' width='6' height='13' rx='1.5' fill='%236c8cff'/><rect x='13' y='9' width='6' height='20' rx='1.5' fill='%2347c2a8'/><rect x='23' y='3' width='6' height='26' rx='1.5' fill='%23f0b04b'/></svg>">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    try { const t = localStorage.getItem('psa-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect x="3" y="16" width="6" height="13" rx="1.5" fill="#6c8cff"/><rect x="13" y="9" width="6" height="20" rx="1.5" fill="#47c2a8"/><rect x="23" y="3" width="6" height="26" rx="1.5" fill="#f0b04b"/></svg>
+      <span>Project Size Analyzer</span>
+    </a>
+    <div class="topbar-actions">
+      <button id="theme-toggle" class="icon-btn" title="테마 전환" aria-label="테마 전환">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.4 5.4 0 0 1-4.4 2.26 5.4 5.4 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section id="input-section" class="card input-card">
+      <h1>프로젝트 규모 · 복잡도 분석</h1>
+      <p class="lead">GitHub 저장소나 로컬 폴더를 분석해 코드 규모, 언어 비율, 구조, 복잡도, 품질 지표, 의존성, 커밋 히스토리를 한눈에 보여줍니다.</p>
+
+      <div class="segmented" role="tablist">
+        <button class="seg active" data-mode="github" role="tab">
+          <svg viewBox="0 0 16 16" width="16" height="16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub 저장소
+        </button>
+        <button class="seg" data-mode="local" role="tab">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M3 5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          로컬 경로
+        </button>
+        <button class="seg" data-mode="upload" role="tab">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7zm-8 14h16v4H4z"/></svg>
+          폴더 선택 (브라우저)
+        </button>
+      </div>
+
+      <form id="analyze-form" autocomplete="off" novalidate>
+        <div class="mode-panel" data-mode="github">
+          <div class="field-row">
+            <label class="field grow">
+              <span>저장소</span>
+              <input id="gh-url" type="text" placeholder="owner/repo 또는 https://github.com/owner/repo" spellcheck="false">
+            </label>
+            <label class="field branch">
+              <span>브랜치 (선택)</span>
+              <input id="gh-branch" type="text" placeholder="기본 브랜치" spellcheck="false">
+            </label>
+          </div>
+          <div class="examples">예시:
+            <button type="button" class="chip" data-example="expressjs/express">expressjs/express</button>
+            <button type="button" class="chip" data-example="psf/requests">psf/requests</button>
+            <button type="button" class="chip" data-example="sharkdp/bat">sharkdp/bat</button>
+            <button type="button" class="chip" data-example="vuejs/core">vuejs/core</button>
+          </div>
+        </div>
+
+        <div class="mode-panel" data-mode="local" hidden>
+          <label class="field">
+            <span>폴더 경로 (서버가 실행 중인 PC 기준)</span>
+            <input id="local-path" type="text" placeholder="예: C:\Users\me\Projects\my-app" spellcheck="false">
+          </label>
+          <p class="hint">Git 저장소라면 .gitignore 규칙과 커밋 히스토리도 함께 분석합니다.</p>
+        </div>
+
+        <div class="mode-panel" data-mode="upload" hidden>
+          <div id="dropzone" class="dropzone" tabindex="0">
+            <svg viewBox="0 0 24 24" width="36" height="36"><path fill="currentColor" d="M3 5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" opacity=".35"/><path fill="currentColor" d="M12 8l4 4h-3v4h-2v-4H8z"/></svg>
+            <strong>폴더를 여기로 끌어다 놓거나 클릭해서 선택</strong>
+            <span id="dropzone-status" class="hint">파일은 업로드되지 않고 브라우저 안에서만 분석됩니다.</span>
+            <input id="folder-input" type="file" webkitdirectory directory multiple hidden>
+          </div>
+        </div>
+
+        <details class="options">
+          <summary>고급 옵션</summary>
+          <div class="options-grid">
+            <label class="field span-2">
+              <span>제외할 폴더/파일 (쉼표 또는 줄바꿈 구분, glob 지원: *.min.js, docs/**)</span>
+              <textarea id="opt-ignore" rows="3" spellcheck="false"></textarea>
+            </label>
+            <label class="check"><input id="opt-gitignore" type="checkbox" checked> .gitignore 규칙 따르기 (Git 저장소)</label>
+            <label class="check"><input id="opt-history" type="checkbox" checked> 커밋 히스토리 분석</label>
+            <label class="field small">
+              <span>파일당 최대 크기 (MB, 초과 시 줄 수 미집계)</span>
+              <input id="opt-maxsize" type="number" min="0.1" max="50" step="any" value="2">
+            </label>
+            <button type="button" id="opt-reset" class="btn ghost small">기본값 복원</button>
+          </div>
+        </details>
+
+        <div class="form-actions">
+          <button type="submit" id="analyze-btn" class="btn primary">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M10 2a8 8 0 0 1 6.32 12.9l5.39 5.4-1.41 1.4-5.4-5.39A8 8 0 1 1 10 2zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12z"/></svg>
+            분석 시작
+          </button>
+        </div>
+      </form>
+
+      <div id="recent" class="recent" hidden></div>
+    </section>
+
+    <section id="progress-section" class="card progress-card" hidden>
+      <div class="progress-head">
+        <div class="spinner"></div>
+        <div>
+          <strong id="progress-title">분석 중…</strong>
+          <div id="progress-msg" class="hint"></div>
+        </div>
+        <button id="cancel-btn" class="btn ghost small">취소</button>
+      </div>
+      <div class="progress-bar"><div id="progress-fill"></div></div>
+    </section>
+
+    <div id="error-box" class="error-box" hidden></div>
+
+    <section id="results" hidden>
+      <div class="result-head">
+        <div class="result-title">
+          <div id="result-source" class="badge"></div>
+          <h2 id="result-name"></h2>
+          <div id="result-meta" class="hint"></div>
+        </div>
+        <div class="result-actions">
+          <button id="export-md" class="btn ghost small">Markdown 리포트</button>
+          <button id="export-json" class="btn ghost small">JSON 저장</button>
+          <button id="new-analysis" class="btn small">새 분석</button>
+        </div>
+      </div>
+      <nav class="tabs" id="tabs"></nav>
+      <div id="tab-content"></div>
+    </section>
+  </main>
+
+  <footer class="footer">Project Size Analyzer · 로컬에서 실행 · 복잡도 수치는 휴리스틱 기반 추정치입니다</footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
