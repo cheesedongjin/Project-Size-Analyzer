@@ -79,11 +79,13 @@ function findings(r) {
   const s = r.summary;
   const srcCode = r.categories.source?.code || 0;
 
+  if (r.scope?.files) add('warn', '분석 범위', '복사본·실행 데이터 포함 여부를 확인하세요', `${num(r.scope.files)}개 파일 (${pct(r.scope.ratio)}): ${r.scope.candidates.slice(0, 10).map((g) => g.path).join(', ')}. 중복률과 품질 점수가 왜곡될 수 있습니다.`, '불필요한 경로를 제외 규칙에 추가한 뒤 다시 분석하세요.');
+
   // 복잡도 · 함수
   const f = r.functions;
   if (f?.count) {
     const worst = f.topComplex[0];
-    if (f.over50) add('bad', '복잡도', `테스트가 사실상 불가능한 수준의 함수 ${num(f.over50)}개`, `순환 복잡도 50을 넘는 함수가 있습니다. 가장 복잡한 함수는 ${worst.name} (${short(worst.path)}:${worst.line}, 복잡도 ${worst.cx}, ${worst.length}줄)입니다.`, '분기별로 작은 함수로 쪼개고, 조건 분기는 조기 반환(guard clause)·전략 패턴·테이블 조회로 단순화하세요.');
+    if (f.over50) add('bad', '복잡도', `추정 복잡도가 매우 높은 함수 ${num(f.over50)}개`, `순환 복잡도 50을 넘는 함수가 있습니다. 가장 복잡한 함수는 ${worst.name} (${short(worst.path)}:${worst.line}, 복잡도 ${worst.cx}, ${worst.length}줄)입니다.`, '분기별로 작은 함수로 쪼개고, 조건 분기는 조기 반환(guard clause)·전략 패턴·테이블 조회로 단순화하세요.');
     else if (f.over20) add('warn', '복잡도', `복잡도가 높은 함수 ${num(f.over20)}개 (20 초과)`, `가장 복잡한 함수는 ${worst.name} (${short(worst.path)}:${worst.line}, 복잡도 ${worst.cx})입니다.`, '복잡도 10 이하를 목표로 함수를 분리하고, 분리 전에 테스트를 먼저 보강하세요.');
     else if (f.over10 / f.count < 0.03) add('good', '복잡도', '함수 대부분이 단순합니다', `복잡도 10 이하 함수 비율이 ${pct(1 - f.over10 / f.count)}입니다.`);
     if (f.long100) add(f.long100 / f.count > 0.03 ? 'warn' : 'info', '함수', `100줄이 넘는 긴 함수 ${num(f.long100)}개`, `가장 긴 함수는 ${f.topLong[0].name} (${short(f.topLong[0].path)}, ${f.topLong[0].length}줄)입니다. 함수 평균 길이는 ${f.avgLength.toFixed(1)}줄, 상위 10%는 ${f.p90Length}줄 이상입니다.`, '한 함수가 한 가지 일만 하도록 단계별 하위 함수로 추출(Extract Method)하세요.');
@@ -114,7 +116,7 @@ function findings(r) {
   if (srcCode > 500) {
     if (s.testRatio === 0) add('bad', '테스트', '테스트 코드를 찾지 못했습니다', '테스트 폴더(test, tests, __tests__, spec)나 *.test.*, *_test.* 형식의 파일이 없습니다.', '핵심 로직부터 단위 테스트를 추가하고 CI에서 자동 실행하세요.');
     else if (s.testRatio < 0.1) add('warn', '테스트', `테스트 코드 비율이 낮습니다 (${pct(s.testRatio)})`, `소스 ${num(srcCode)}줄 대비 테스트 ${num(r.categories.test?.code)}줄.`, '핫스팟·복잡도 상위 파일부터 테스트를 보강하면 효과가 큽니다.');
-    else if (s.testRatio >= 0.3) add('good', '테스트', `테스트 코드가 충분합니다 (${pct(s.testRatio)})`, `테스트 ${num(r.categories.test?.code)}줄.`);
+    else if (s.testRatio >= 0.3) add('good', '테스트', `테스트 코드 비율이 높습니다 (${pct(s.testRatio)})`, `테스트 ${num(r.categories.test?.code)}줄. 코드량 비율이며 테스트 커버리지나 검증 품질을 뜻하지 않습니다.`);
     if (s.commentRatio < 0.05) add('warn', '문서화', `주석이 매우 적습니다 (${pct(s.commentRatio)})`, '코드만으로 의도가 드러나지 않는 부분(왜 이렇게 했는지)에 설명이 부족할 수 있습니다.', '공개 API와 복잡한 알고리즘, 비직관적인 결정에 주석을 다세요.');
     else if (s.commentRatio > 0.35) add('info', '문서화', `주석 비율이 매우 높습니다 (${pct(s.commentRatio)})`, '라이선스 헤더나 주석 처리된 옛 코드가 많은지 확인해 보세요.');
     else if (s.commentRatio >= 0.1) add('good', '문서화', `주석 비율 적정 (${pct(s.commentRatio)})`, '');
@@ -142,7 +144,7 @@ function findings(r) {
     const miss = (k) => hy.items.find((i) => i.key === k && !i.ok && !i.na);
     if (miss('readme')) add('bad', '위생', 'README가 없습니다', '처음 보는 사람이 프로젝트 목적과 실행 방법을 알 수 없습니다.', '목적, 설치, 실행, 기여 방법을 담은 README.md를 추가하세요.');
     if (miss('license') && r.meta?.source === 'github') add('warn', '위생', '라이선스 파일이 없습니다', '공개 저장소라도 라이선스가 없으면 법적으로 재사용할 수 없습니다.', 'MIT, Apache-2.0 등 적합한 라이선스를 선택해 LICENSE 파일을 추가하세요.');
-    if (miss('ci') && srcCode > 2000) add('warn', '위생', 'CI 설정을 찾지 못했습니다', '변경마다 빌드·테스트가 자동으로 실행되지 않습니다.', 'GitHub Actions 등으로 빌드·테스트·린트를 자동화하세요.');
+    if (miss('ci') && srcCode > 2000) add('warn', '위생', 'CI 설정을 찾지 못했습니다', '분석한 파일에서 지원하는 CI 설정을 발견하지 못했습니다. 외부 CI나 제외된 설정은 확인할 수 없습니다.', 'GitHub Actions 등으로 빌드·테스트·린트를 자동화하세요.');
     if (miss('lock')) add('info', '의존성', '의존성 잠금 파일이 없습니다', '애플리케이션이라면 환경마다 다른 버전이 설치되어 "내 컴퓨터에선 되는데" 문제가 생길 수 있습니다. 다른 프로젝트가 가져다 쓰는 라이브러리는 의도적으로 커밋하지 않기도 합니다.', '애플리케이션이라면 패키지 매니저가 생성하는 lock 파일을 커밋하세요.');
     if (miss('linter') && srcCode > 2000) add('info', '위생', '린터 설정을 찾지 못했습니다', '', '언어별 린터(ESLint, Ruff, golangci-lint 등)를 도입하세요.');
     if (hy.score >= 0.8) add('good', '위생', `프로젝트 위생 점검 ${hy.passed}/${hy.total} 충족`, '문서, 자동화, 품질 도구가 잘 갖춰져 있습니다.');

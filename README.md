@@ -72,5 +72,10 @@ public/              Frontend (vanilla JS, SVG charts)
 
 ## Notes
 
+- Browser folder analysis does not apply `.gitignore`. Exclusion rules are applied again when analysis starts, including edits made after selecting a folder. Exported JSON records the selected options.
+- Reports warn about possible verification copies or runtime data in `.verify-*`, `.pimpi`, and `.claude`. These folders are not automatically excluded: review their contents and add unwanted paths to the exclusion rules. Copies can inflate duplication and quality metrics.
+- Test line ratios do not measure coverage. CI findings only describe configurations detectable in the analyzed files.
+- Run regression tests with `npm test`.
+
 - Complexity, function counts, and nesting are **heuristic estimates** based on keywords and braces/indentation, not a real parser.
 - The server listens only on `127.0.0.1` and rejects requests whose Host header isn't localhost.

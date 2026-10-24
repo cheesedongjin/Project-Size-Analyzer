@@ -1,4 +1,5 @@
 import { DEFAULT_IGNORE, makeIgnore, parsePatterns } from '../shared/ignore.js';
+import { filterFiles } from '../shared/scope.js';
 import { CATEGORY_LABELS } from '../shared/analyzer.js';
 import { LANGUAGES } from '../shared/languages.js';
 import { STACK_CATEGORIES } from '../shared/stack.js';
@@ -81,9 +82,11 @@ function initInputs() {
     const files = [];
     for (const f of list) {
       const rel = f.webkitRelativePath.split('/').slice(1).join('/');
-      if (rel && !ig.path(rel)) files.push({ path: rel, file: f });
+      if (rel) files.push({ path: rel, file: f });
     }
-    setUpload(root, files, list.length - files.length);
+    const selected = filterFiles(files, ig);
+    setUpload(root, selected, files.length - selected.length);
+    state.upload.allFiles = files;
   });
   dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag'); });
   dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
@@ -96,6 +99,7 @@ function initInputs() {
     const ig = makeIgnore(parsePatterns($('#opt-ignore').value));
     const files = await readDirEntry(entry, '', ig);
     setUpload(entry.name, files, 0);
+    state.upload.entry = entry;
   });
 
   $('#analyze-form').addEventListener('submit', (e) => { e.preventDefault(); start(); });
@@ -177,7 +181,7 @@ async function start() {
     const path = $('#local-path').value.trim();
     if (!path) return showError('폴더 경로를 입력하세요.');
     payload = { source: 'local', path, options };
-  } else if (!state.upload?.files.length) {
+  } else if (!state.upload) {
     return showError('분석할 폴더를 먼저 선택하세요.');
   }
 
@@ -186,13 +190,20 @@ async function start() {
   try {
     let report;
     if (state.mode === 'upload') {
-      report = await runInWorker(state.upload.files, options.maxFileMB * 1024 * 1024);
+      const ig = makeIgnore(options.ignore);
+      const files = state.upload.entry
+        ? await readDirEntry(state.upload.entry, '', ig)
+        : filterFiles(state.upload.allFiles, ig);
+      if (!files.length) throw new Error('분석할 파일이 없습니다. 제외 규칙을 확인하세요.');
+      report = await runInWorker(files, options.maxFileMB * 1024 * 1024);
+      report.warnings.push('브라우저 폴더 분석에서는 .gitignore가 적용되지 않습니다. 제외 규칙을 직접 지정하거나 로컬 경로 모드를 사용하세요.');
       report.meta = { source: 'upload', name: state.upload.name, target: `${state.upload.name} (브라우저에서 선택)`, analyzedAt: Date.now(), durationMs: Date.now() - t0 };
     } else {
       report = await runOnServer(payload);
       const q = payload.source === 'github' ? `?repo=${encodeURIComponent(payload.url)}${payload.branch ? `&branch=${encodeURIComponent(payload.branch)}` : ''}` : `?path=${encodeURIComponent(payload.path)}`;
       history.replaceState(null, '', q);
     }
+    report.meta.options = { ...options, gitignoreApplied: state.mode === 'upload' ? false : undefined };
     state.report = report;
     saveRecent(report, payload);
     showResults();
