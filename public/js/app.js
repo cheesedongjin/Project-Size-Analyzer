@@ -24,6 +24,9 @@ const state = {
   upload: null,
   abort: null,
   worker: null,
+  busy: false,
+  lastAnalysis: null,
+  scopeSelection: new Set(),
   lang: { metric: 'code', scope: 'code' },
   tm: { path: '', metric: 'code' },
   files: { q: '', lang: '', cat: '', sort: 'code', asc: false, limit: 200 },
@@ -170,6 +173,7 @@ function readOptions() {
 }
 
 async function start() {
+  if (state.busy) return;
   hideError();
   const options = readOptions();
   let payload;
@@ -186,6 +190,7 @@ async function start() {
   }
 
   setBusy(true);
+  state.abort = new AbortController();
   const t0 = Date.now();
   try {
     let report;
@@ -194,6 +199,7 @@ async function start() {
       const files = state.upload.entry
         ? await readDirEntry(state.upload.entry, '', ig)
         : filterFiles(state.upload.allFiles, ig);
+      if (state.abort.signal.aborted) throw Object.assign(new Error('취소됨'), { name: 'AbortError' });
       if (!files.length) throw new Error('분석할 파일이 없습니다. 제외 규칙을 확인하세요.');
       report = await runInWorker(files, options.maxFileMB * 1024 * 1024);
       report.warnings.push('브라우저 폴더 분석에서는 .gitignore가 적용되지 않습니다. 제외 규칙을 직접 지정하거나 로컬 경로 모드를 사용하세요.');
@@ -205,6 +211,8 @@ async function start() {
     }
     report.meta.options = { ...options, gitignoreApplied: state.mode === 'upload' ? false : undefined };
     state.report = report;
+    state.lastAnalysis = { mode: state.mode, payload, upload: state.upload, options };
+    state.scopeSelection.clear();
     saveRecent(report, payload);
     showResults();
   } catch (e) {
@@ -215,7 +223,10 @@ async function start() {
 }
 
 function setBusy(on) {
+  state.busy = on;
   $('#analyze-btn').disabled = on;
+  $('#new-analysis').disabled = on;
+  updateScopeControls();
   $('#progress-section').hidden = !on;
   if (on) { setProgress('준비 중…', 2); $('#progress-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 }
@@ -228,11 +239,9 @@ function setProgress(msg, pct) {
 function cancel() {
   state.abort?.abort();
   if (state.worker) { state.worker.terminate(); state.worker = null; state.workerReject?.(Object.assign(new Error('취소됨'), { name: 'AbortError' })); }
-  setBusy(false);
 }
 
 async function runOnServer(payload) {
-  state.abort = new AbortController();
   let res;
   try {
     res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: state.abort.signal });
@@ -411,6 +420,7 @@ function renderOverview(el, r) {
   for (const i of r.insights.items) counts[i.level]++;
 
   el.innerHTML = `<div class="stack">
+    ${renderScopePicker(r)}
     <div class="kpis">
       ${kpi('코드 줄 수', fmt.num(s.code), `전체 ${fmt.num(s.lines)}줄 · 주석 ${fmt.compact(s.comment)} · 공백 ${fmt.compact(s.blank)}`, 'var(--accent)', 'code')}
       ${kpi('파일', fmt.num(s.files), `폴더 ${fmt.num(s.dirs)}개 · 바이너리 ${fmt.num(s.binaryFiles)}개`, 'var(--accent-2)', 'files')}
@@ -462,6 +472,64 @@ function renderOverview(el, r) {
 
     ${r.warnings.length ? `<div class="note warnings">${r.warnings.map(esc).join('<br>')}</div>` : ''}
   </div>`;
+  bindScopePicker(el, r);
+}
+
+function renderScopePicker(r) {
+  const candidates = r.scope?.candidates || [];
+  if (!candidates.length) return '';
+  return `<section class="card scope-picker" aria-labelledby="scope-title">
+    <h3 id="scope-title">의심 폴더 제외 후 다시 분석</h3>
+    <p class="explain">복사본이나 실행 데이터인지 확인하고 제외할 폴더를 선택하세요. 원본 파일은 삭제되지 않으며, 기존 제외 규칙에 선택한 경로를 추가합니다.</p>
+    <div class="scope-actions"><button type="button" class="btn ghost small" data-scope-all>전체 선택</button><button type="button" class="btn ghost small" data-scope-clear>선택 해제</button></div>
+    <div class="scope-folders">${candidates.map((g, i) => `<label class="scope-folder"><input type="checkbox" data-scope-index="${i}" ${state.scopeSelection.has(g.path) ? 'checked' : ''}><span class="mono">${esc(g.path)}/</span><span class="hint">${fmt.num(g.files)}개 · ${fmt.bytes(g.bytes)}</span></label>`).join('')}</div>
+    <div class="scope-actions"><span id="scope-count" role="status" aria-live="polite"></span><button type="button" id="scope-reanalyze" class="btn primary" disabled>선택 폴더 제외하고 다시 분석</button></div>
+  </section>`;
+}
+
+function updateScopeControls() {
+  const panel = $('.scope-picker');
+  if (!panel) return;
+  const selected = (state.report?.scope?.candidates || []).filter((g) => state.scopeSelection.has(g.path));
+  $('#scope-count', panel).textContent = `${selected.length}개 폴더 · ${fmt.num(selected.reduce((n, g) => n + g.files, 0))}개 파일 선택`;
+  $$('input, button', panel).forEach((el) => { el.disabled = state.busy; });
+  $('#scope-reanalyze', panel).disabled = state.busy || !selected.length;
+}
+
+function bindScopePicker(el, r) {
+  const panel = $('.scope-picker', el);
+  if (!panel) return;
+  const candidates = r.scope.candidates;
+  $$('[data-scope-index]', panel).forEach((input) => input.addEventListener('change', () => {
+    const path = candidates[Number(input.dataset.scopeIndex)].path;
+    if (input.checked) state.scopeSelection.add(path); else state.scopeSelection.delete(path);
+    updateScopeControls();
+  }));
+  const selectAll = (on) => {
+    for (const g of candidates) { if (on) state.scopeSelection.add(g.path); else state.scopeSelection.delete(g.path); }
+    $$('[data-scope-index]', panel).forEach((input) => { input.checked = on; });
+    updateScopeControls();
+  };
+  $('[data-scope-all]', panel).addEventListener('click', () => selectAll(true));
+  $('[data-scope-clear]', panel).addEventListener('click', () => selectAll(false));
+  $('#scope-reanalyze', panel).addEventListener('click', () => {
+    if (state.busy || !state.scopeSelection.size) return;
+    const previous = state.lastAnalysis;
+    const paths = candidates.filter((g) => state.scopeSelection.has(g.path)).map((g) => `${g.path}/**`);
+    const options = { ...previous.options, ignore: [...new Set([...previous.options.ignore, ...paths])] };
+    setMode(previous.mode);
+    state.upload = previous.upload;
+    if (previous.mode === 'github') {
+      $('#gh-url').value = previous.payload.url;
+      $('#gh-branch').value = previous.payload.branch;
+    } else if (previous.mode === 'local') $('#local-path').value = previous.payload.path;
+    $('#opt-ignore').value = options.ignore.join('\n');
+    $('#opt-gitignore').checked = options.useGitignore;
+    $('#opt-history').checked = options.history;
+    $('#opt-maxsize').value = options.maxFileMB;
+    start();
+  });
+  updateScopeControls();
 }
 
 function scoreParts(sc) {

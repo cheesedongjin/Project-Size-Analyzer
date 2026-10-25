@@ -74,6 +74,7 @@ public/              Frontend (vanilla JS, SVG charts)
 
 - Browser folder analysis does not apply `.gitignore`. Exclusion rules are applied again when analysis starts, including edits made after selecting a folder. Exported JSON records the selected options.
 - Reports warn about possible verification copies or runtime data in `.verify-*`, `.pimpi`, and `.claude`. These folders are not automatically excluded: review their contents and add unwanted paths to the exclusion rules. Copies can inflate duplication and quality metrics.
+- In the results overview, select suspicious folders and click **선택 폴더 제외하고 다시 분석** to rerun the same target with those paths added to the existing exclusions. File counts and sizes are shown before selection; original files are never deleted. Browser mode reuses the selected folder for the current page session.
 - Test line ratios do not measure coverage. CI findings only describe configurations detectable in the analyzed files.
 - Run regression tests with `npm test`.
 

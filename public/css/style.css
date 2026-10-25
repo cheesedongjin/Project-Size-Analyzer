@@ -312,6 +312,13 @@ td.path .dir { color: var(--muted); }
 
 .note { background: var(--bg-2); border-radius: 10px; padding: 12px 14px; color: var(--text-2); font-size: 12.5px; }
 .warnings { border-left: 3px solid var(--warn); }
+.scope-picker { border-left: 3px solid var(--warn); }
+.scope-folders { max-height: 280px; overflow: auto; margin: 12px 0; }
+.scope-folder { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 9px 4px; cursor: pointer; }
+.scope-folder .mono { flex: 1; min-width: 120px; overflow-wrap: anywhere; }
+.scope-folder input { accent-color: var(--accent); }
+.scope-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.scope-actions [role="status"] { flex: 1; min-width: 180px; color: var(--text-2); }
 
 .tooltip {
   position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none; opacity: 0;
